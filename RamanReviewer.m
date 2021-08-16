@@ -1,6 +1,6 @@
 % Raman Review MATLAB Program %
 % Author: Kenny Brown
-% Version 1.1 (8/16/2021)
+% Version 1.2 (8/16/2021)
 clc
 clear all
 close all
@@ -30,11 +30,21 @@ close all
 data = importdata([path file]);
 
 % Shift data down y-axis so min intensity at zero
-shift = min(data(:,2));
-data(:,2) = data(:,2)-shift;
+% shift = min(data(:,2));
+% data(:,2) = data(:,2)-shift;
+
+% Baseline Shift
+% (https://www.mathworks.com/matlabcentral/answers/480651-shifting-baselines-of-raman-spectra)
+[Cp,Sl,Ic] = ischange(data(:,2),'linear');                  % Detect Changes, Calculates Slopes (& Intercepts)
+[Cts,Edg,Bin] = histcounts(Sl, 500);                         % Histogram Of Slopes
+[Max,Binmax] = max(Cts);                                    % Find Largest Bin
+LinearRegion = (Bin==Binmax);                               % Logical Vector Of Values Corresponding To Largest Number Of Slopes
+B = polyfit(data(LinearRegion,1), data(LinearRegion,2), 1); % Linear Fit
+L = polyval(B, data(:,1));                                  % Evaluate
+yc = data(:,2) - L;                                         % Detrend
+data(:,2) = yc+abs(min(yc));
 
 % Determine characteristic peaks in each typical range for thoes peaks
-
 % D Peak
 Dsearch = find(data(:,1)>1325 & data(:,1)<1375);
 [Dpk,Dloc] = findpeaks(data(Dsearch,2),'NPeaks',1);
@@ -52,7 +62,7 @@ D2loc = D2search(D2loc);
 
 % D+G Peak
 DGsearch = find(data(:,1)>2925 & data(:,1)<2975);
-[DGpk,DGloc] = findpeaks(data(DGsearch,2),'NPeaks',1,'MinPeakProminence',25);
+[DGpk,DGloc] = findpeaks(data(DGsearch,2),'NPeaks',1,'MinPeakProminence',15);
 DGloc = DGsearch(DGloc);
 
 % 2D prime Peak
@@ -77,9 +87,11 @@ title(file,'Interpreter','none')
 %% GRAPHENE CHARACTERIZATIONS
 
 % Raman Shift of Characteristic Peaks
-Peak_D = data(Dloc);
-Peak_G = data(Gloc);
-Peak_2D = data(D2loc);
+Peak_D = data(Dloc); %D Peak (1/cm)
+Peak_G = data(Gloc); %G Peak (1/cm)
+Peak_2D = data(D2loc); %2D Peak (1/cm)
+Peak_GD = data(DGloc); %G+D Peak (1/cm)
+Peak_2Dp = data(D2ploc); %2D' Peak (1/cm)
 
 % Number of layers by G peak position
 lyrbyG = ((7963-5*Peak_G-1))/(5*Peak_G-7908)^(5/8);
@@ -91,6 +103,10 @@ lyrbyG_2D = (IGI2D-0.14)*10;
 fprintf('Number of layers as indicated by IG / I2D ratio: %f\n\n', lyrbyG_2D)
 
 %% Changelog
+
+% V1.2 - Added baseline subtraction script based on source shown at
+% corresponding section.
+
 % V1.1 - replaced full spectrum findpeaks with individual findpeaks for
 % each target peak range (G,D,2D,DG, and 2D prim peaks) to make peak
 % finding more reliable. added function to shift trace to y-axis to improve
